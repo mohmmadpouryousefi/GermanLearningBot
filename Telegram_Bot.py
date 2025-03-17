@@ -5,9 +5,6 @@ from db import save_message, get_conversation_history
 
 # ======= CONFIGURATION ========
 
-# ... existing code ...
-
-# ======= CONFIGURATION ========
 from dotenv import load_dotenv
 import os
 
@@ -15,7 +12,7 @@ import os
 load_dotenv()
 
 # Get token from environment variable
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "your_default_token_here")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7923002260:AAHzDXUqYdrarHjFHHOIRyY7GVj9SyO3_jE")
 
 # ======= START COMMAND ========
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -57,7 +54,8 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("1. Konversation (مکالمه)", callback_data='konversation')],
             [InlineKeyboardButton("2. Vokabeln (لغات)", callback_data='vokabeln')],
-            [InlineKeyboardButton("3. Quiz (آزمون)", callback_data='quiz')]
+            [InlineKeyboardButton("3. Quiz (آزمون)", callback_data='quiz')],
+            [InlineKeyboardButton("4. AI Lehrer (معلم هوش مصنوعی)", callback_data='ai_teacher')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -68,7 +66,8 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Was möchtest du jetzt üben?\n"
                 "1. Konversation (مکالمه)\n"
                 "2. Vokabeln (لغات)\n"
-                "3. Quiz (آزمون)"
+                "3. Quiz (آزمون)\n"
+                "4. AI Lehrer (معلم هوش مصنوعی)"
             ),
             reply_markup=reply_markup
         )
@@ -87,6 +86,10 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif choice == 'quiz':
         await query.answer()
         await start_quiz(query, context)
+    
+    elif choice == 'ai_teacher':
+        await query.answer()
+        await start_ai_teacher(query, context)
     
     # Fix: Changed 'if' to 'elif' to properly handle button callbacks
     elif choice == 'next_word':
@@ -334,6 +337,129 @@ async def check_quiz_answer(query, context, answer_index):
     )
 
 
+# ======= AI TEACHER ========
+async def start_ai_teacher(query, context):
+    level = context.user_data.get('level', 'A1')
+    
+    # Set the state to indicate we're in AI teacher mode
+    context.user_data['state'] = 'ai_teacher'
+    
+    # Welcome message from the AI teacher
+    welcome_message = (
+        f"👨‍🏫 Hallo! Ich bin dein KI-Deutschlehrer für Niveau {level}.\n\n"
+        f"(سلام! من معلم هوش مصنوعی آلمانی شما برای سطح {level} هستم.)\n\n"
+        "Du kannst mit mir auf Deutsch sprechen, und ich werde dir helfen, deine Sprachkenntnisse zu verbessern.\n"
+        "(می‌توانید به آلمانی با من صحبت کنید و من به شما کمک می‌کنم مهارت‌های زبانی خود را بهبود دهید.)\n\n"
+        "Schreib mir einfach eine Nachricht!\n"
+        "(کافیست یک پیام برای من بنویسید!)"
+    )
+    
+    # Add button to exit AI teacher mode
+    keyboard = [[InlineKeyboardButton("🔙 Zurück zum Menü (بازگشت به منو)", callback_data='back_to_menu')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await context.bot.send_message(
+        chat_id=query.message.chat.id,
+        text=welcome_message,
+        reply_markup=reply_markup
+    )
+
+# Add a message handler for the AI teacher conversation
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    user_message = update.message.text
+    
+    # Check if we're in AI teacher mode
+    if context.user_data.get('state') != 'ai_teacher':
+        # If not in AI teacher mode, ignore the message
+        return
+    
+    # Get the user's level
+    level = context.user_data.get('level', 'A1')
+    
+    # Save the user's message to the database
+    save_message(user_id, user_message, role="user")
+    
+    # Show typing indicator
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+    
+    # Get conversation history
+    history = get_conversation_history(user_id, limit=5)
+    
+    # Format history for the AI
+    formatted_history = "\n".join([
+        f"{'User' if msg['role'] == 'user' else 'Teacher'}: {msg['message']}"
+        for msg in history
+    ])
+    
+    # Create the prompt for the AI
+    prompt = f"""You are a professional German language teacher. The student is at level {level}.
+    
+Your task is to:
+1. Always respond in German appropriate for level {level}
+2. Provide Persian translations for difficult words or phrases in parentheses
+3. Gently correct any grammar or vocabulary mistakes
+4. Be encouraging and supportive
+5. Keep responses concise (max 150 words)
+
+Recent conversation history:
+{formatted_history}
+
+Student's message: {user_message}
+
+Respond as a helpful German teacher:"""
+    
+    try:
+        # Get response from AI
+        ai_response = await ask_openrouter(prompt, purpose="ai_teacher")
+        
+        # Save the AI's response to the database
+        save_message(user_id, ai_response, role="assistant")
+        
+        # Add button to exit AI teacher mode
+        keyboard = [[InlineKeyboardButton("🔙 Zurück zum Menü (بازگشت به منو)", callback_data='back_to_menu')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        # Send the response to the user
+        await update.message.reply_text(
+            ai_response,
+            reply_markup=reply_markup
+        )
+    except Exception as e:
+        print(f"AI Teacher Error: {str(e)}")
+        await update.message.reply_text(
+            "⚠️ Es gab ein Problem mit dem AI-Lehrer. Bitte versuche es erneut. (مشکلی با معلم هوش مصنوعی پیش آمد. لطفا دوباره تلاش کنید.)"
+        )
+
+# Handle the back to menu button
+async def back_to_menu(query, context):
+    level = context.user_data.get('level', 'A1')
+    
+    # Show practice options
+    keyboard = [
+        [InlineKeyboardButton("1. Konversation (مکالمه)", callback_data='konversation')],
+        [InlineKeyboardButton("2. Vokabeln (لغات)", callback_data='vokabeln')],
+        [InlineKeyboardButton("3. Quiz (آزمون)", callback_data='quiz')],
+        [InlineKeyboardButton("4. AI Lehrer (معلم هوش مصنوعی)", callback_data='ai_teacher')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await context.bot.send_message(
+        chat_id=query.message.chat.id,
+        text=(
+            f"Zurück zum Hauptmenü für Niveau {level}. (بازگشت به منوی اصلی برای سطح {level})\n"
+            "Was möchtest du jetzt üben?\n"
+            "1. Konversation (مکالمه)\n"
+            "2. Vokabeln (لغات)\n"
+            "3. Quiz (آزمون)\n"
+            "4. AI Lehrer (معلم هوش مصنوعی)"
+        ),
+        reply_markup=reply_markup
+    )
+    
+    # Reset state
+    context.user_data['state'] = 'level_selected'
+
 # ======= MAIN =========
 if __name__ == '__main__':
     try:
@@ -344,9 +470,13 @@ if __name__ == '__main__':
         print("Adding command handlers...")
         app.add_handler(CommandHandler('start', start))
         app.add_handler(CallbackQueryHandler(button))
+        
+        # Add message handler for AI teacher
+        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-        print("✅ Bot is running... Press Ctrl+C to stop")
-        app.run_polling()
+        # For cloud deployment - keep the bot running
+        print("✅ Bot is running...")
+        app.run_polling(allowed_updates=Update.ALL_TYPES)
     except Exception as e:
         print(f"❌ Error starting bot: {str(e)}")
         import traceback

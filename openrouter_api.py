@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Get API key from environment variable
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "your_default_key_here")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "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")
 
 async def ask_openrouter(prompt, purpose="general"):
     """
