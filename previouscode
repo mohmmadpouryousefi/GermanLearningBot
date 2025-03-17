@@ -1,0 +1,87 @@
+from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from openrouter_api import ask_openrouter
+from db import save_message, get_conversation_history
+
+# ======= CONFIGURATION ========
+TELEGRAM_BOT_TOKEN = "7923002260:AAHzDXUqYdrarHjFHHOIRyY7GVj9SyO3_jE"
+
+# ======= START COMMAND ========
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+
+    # مرحلۀ اول: انتخاب سطح زبان
+    keyboard = [
+        ["🟢 A1 - Anfänger", "🟡 A2 - Anfänger"],
+        ["🟠 B1 - Mittelstufe", "🔵 B2 - Mittelstufe"],
+        ["🟣 C1 - Fortgeschritten", "⚫ C2 - Meister"]
+    ]
+    reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
+
+    await update.message.reply_text(
+        "Willkommen beim Deutsch-Lernbot! 🎉\n"
+        "Bitte wähle dein Niveau (سطح خود را انتخاب کن):",
+        reply_markup=reply_markup
+    )
+
+    # Save initial state (waiting for level choice)
+    context.user_data['state'] = 'choose_level'
+
+# ======= CHAT HANDLER ========
+async def chat_with_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    user_message = update.message.text.strip()
+
+    # اگر هنوز سطح انتخاب نشده است، منتظر انتخاب سطح کاربر هستیم
+    if context.user_data.get('state') == 'choose_level':
+        context.user_data['level'] = user_message  # ذخیره سطح انتخابی
+        context.user_data['state'] = 'chat'
+        
+        # نمایش پیام برای انتخاب نوع تمرین
+        keyboard = [
+            ["1. Konversation (مکالمه)", "2. Vokabeln (لغات)"],
+            ["3. Quiz (آزمون)"]
+        ]
+        reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
+        
+        await update.message.reply_text(
+            f"Du hast {user_message} gewählt. (شما سطح {user_message} را انتخاب کردید)\n"
+            "Was möchtest du jetzt üben?\n"
+            "1. Konversation (مکالمه)\n"
+            "2. Vokabeln (لغات)\n"
+            "3. Quiz (آزمون)",
+            reply_markup=reply_markup
+        )
+        return
+
+    # ادامه مکالمه با توجه به سطح انتخاب شده
+    user_level = context.user_data.get('level', '🟢 A1 - Anfänger')  # اگر سطح انتخاب نشده باشد، A1 پیشفرض است
+    history = get_conversation_history(user_id)
+    messages = [
+        {"role": "system", "content": f"Du bist ein Deutschlehrer auf {user_level} Niveau. Sprich nur Deutsch. Übersetze alles ins Persische (فارسی)."}  # Update system message to request Persian translation
+    ] + history + [{"role": "user", "content": user_message}]
+
+    # دریافت پاسخ از OpenRouter
+    ai_reply = ask_openrouter(messages)
+
+    # ذخیره پیام در دیتابیس
+    save_message(user_id, "user", user_message)
+    save_message(user_id, "assistant", ai_reply)
+
+    await update.message.reply_text(ai_reply)
+
+# ======= MAIN FUNCTION TO RUN BOT ========
+def main():
+    # Initialize the database
+    init_db()  # Make sure the database and table are created before running the bot
+
+    app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT, chat_with_ai))
+
+    print("✅ Bot is running...")
+    app.run_polling()
+
+if __name__ == '__main__':
+    main()
