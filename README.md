@@ -1,6 +1,6 @@
 ![German Learning Bot](./images/an%20image%20for%20the%20app%20GermanLearningBot.png)
 
-A Telegram bot to help users learn German at different proficiency levels (A1-C2).
+### A Telegram bot to help users learn German at different proficiency levels (A1-C2).
 
 ## Features
 
