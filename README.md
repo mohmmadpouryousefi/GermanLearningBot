@@ -9,6 +9,7 @@ A Telegram bot to help users learn German at different proficiency levels (A1-C2
 - **Vocabulary builder**: Learn new German words with examples
 - **Interactive quizzes**: Test your knowledge with multiple-choice questions
 - **Bilingual support**: Instructions in both German and Persian
+- **Realtime AI assitant**: Add chat bot support
 
 ## Technologies Used
 
