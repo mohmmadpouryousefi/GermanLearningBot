@@ -12,7 +12,7 @@ import os
 load_dotenv()
 
 # Get token from environment variable
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7923002260:AAHzDXUqYdrarHjFHHOIRyY7GVj9SyO3_jE")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_TOKEN")
 
 # ======= START COMMAND ========
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
