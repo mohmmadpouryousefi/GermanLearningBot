@@ -9,7 +9,7 @@
 - **Vocabulary builder**: Learn new German words with examples
 - **Interactive quizzes**: Test your knowledge with multiple-choice questions
 - **Bilingual support**: Instructions in both German and Persian
-- **Realtime AI assitant**: Add chat bot support
+- **Real Time AI assistant**: Add chat bot support
 
 ## Technologies Used
 
