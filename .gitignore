@@ -5,6 +5,7 @@ __pycache__/
 *.so
 .Python
 env/
+.venv/
 build/
 develop-eggs/
 dist/
@@ -26,6 +27,7 @@ var/
 
 # Environment variables
 .env
+.env.backup
 
 # IDE files
 .idea/
